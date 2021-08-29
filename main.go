@@ -1,17 +1,29 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+	"strconv"
+
+	. "github.com/strogiyotec/readactor/termio"
+)
 
 func main() {
 	fmt.Println("Hello From Readactor")
-}
-
-type Termios struct {
-	Iflag  uint32   //Input mode flags
-	Oflag  uint32   //Output mode flags
-	Cflag  uint32   //Control mode flags
-	Lflag  uint32   // Local mode flags
-	Cc     [20]byte //Control Characters
-	Ispeed uint32   //Input speed
-	Ospeed uint32   //Output speed
+	err := EnableRawMode()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer DisableRawMode()
+	buffer := make([]byte, 1)
+	for cc, err := os.Stdin.Read(buffer); buffer[0] != 'q' && err == nil && cc == 1; cc, err = os.Stdin.Read(buffer) {
+		var r rune
+		r = rune(buffer[0])
+		if strconv.IsPrint(r) {
+			fmt.Printf("%d  %c\r\n", buffer[0], r)
+		} else {
+			fmt.Printf("%d\r\n", buffer[0])
+		}
+	}
 }
