@@ -55,6 +55,10 @@ func processKeypress() error {
 			RefreshScreen()
 			return errors.New("Stop command")
 		}
+	case TOP, DOWN, LEFT, RIGHT: //vim movement
+		{
+			MoveCursor(r)
+		}
 	}
 	return nil
 }
