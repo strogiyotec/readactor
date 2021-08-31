@@ -50,10 +50,13 @@ type WinSize struct {
 }
 
 func RefreshScreen() {
-	io.WriteString(os.Stdout, "\x1b[2J")
+	//hide cursor
+	io.WriteString(os.Stdout, "\x1b[25l")
 	io.WriteString(os.Stdout, "\x1b[H")
 	drawRows()
 	io.WriteString(os.Stdout, "\x1b[H")
+	//show cursor
+	io.WriteString(os.Stdout, "\x1b[25h")
 }
 
 func InitEditor() error {
@@ -120,19 +123,36 @@ func TcGetAttr(fd uintptr) (*Termios, error) {
 }
 
 func drawRows() {
-	//TODO: hardcoded 24 is amount of rows in a file
-	//will be replaced by actual amount of rows in the future
-	for i := 0; i < config.screenRows; i++ {
-		io.WriteString(os.Stdout, "~\r\n")
+	for y := 0; y < config.screenRows-1; y++ {
+		if y == config.screenRows/3 {
+			io.WriteString(
+				os.Stdout,
+				fmt.Sprintf("Kilo editor -- version %s", config.Version()),
+			)
+		} else {
+			io.WriteString(
+				os.Stdout,
+				"~",
+			)
+		}
+		io.WriteString(
+			os.Stdout,
+			"\x1b[K",
+		)
+		if y < config.screenRows-1 {
+			io.WriteString(os.Stdout, "\r\n")
+		}
 	}
 }
 func getTerminalSize() error {
 	var w WinSize
-	_, _, err := syscall.Syscall(syscall.SYS_IOCTL,
+	_, _, err := syscall.Syscall(
+		syscall.SYS_IOCTL,
 		os.Stdout.Fd(),
 		syscall.TIOCGWINSZ,
 		uintptr(unsafe.Pointer(&w)),
 	)
+	//move cursor bottom right
 	if err != 0 {
 		return errors.New(
 			fmt.Sprintf(
