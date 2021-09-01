@@ -86,6 +86,8 @@ func InitEditor() error {
 	//cursor in the top left corner
 	config.CursorX = 0
 	config.CursorY = 0
+	config.numRows = 1
+	config.contentRow.content = []byte("Hello world")
 	return getTerminalSize()
 }
 
@@ -187,23 +189,36 @@ func TcGetAttr(fd uintptr) (*Termios, error) {
 
 func drawRows() {
 	for y := 0; y < config.screenRows-1; y++ {
-		if y == config.screenRows/3 {
+		//display content of a file
+		if y == config.numRows {
+			//if content is bigger than amount of columns then truncate
+			length := len(config.contentRow.content)
+			if length > config.screenColumns {
+				length = config.screenColumns
+			}
 			io.WriteString(
 				os.Stdout,
-				fmt.Sprintf("Kilo editor -- version %s", config.Version()),
+				string(config.contentRow.content)[0:length],
 			)
 		} else {
+			if y == config.screenRows/3 {
+				io.WriteString(
+					os.Stdout,
+					fmt.Sprintf("readactor editor -- version %s", config.Version()),
+				)
+			} else {
+				io.WriteString(
+					os.Stdout,
+					"~",
+				)
+			}
 			io.WriteString(
 				os.Stdout,
-				"~",
+				"\x1b[K",
 			)
-		}
-		io.WriteString(
-			os.Stdout,
-			"\x1b[K",
-		)
-		if y < config.screenRows-1 {
-			io.WriteString(os.Stdout, "\r\n")
+			if y < config.screenRows-1 {
+				io.WriteString(os.Stdout, "\r\n")
+			}
 		}
 	}
 }
