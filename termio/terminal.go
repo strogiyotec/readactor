@@ -1,30 +1,10 @@
 package termio
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
-	"syscall"
-	"unsafe"
-)
-
-//local flags
-const (
-	readByByte    = syscall.ICANON
-	disableCtrlCZ = syscall.ISIG
-	disableCtrlV  = syscall.IEXTEN
-)
-
-//input flags
-const (
-	disableCtrlSQ = syscall.IXON
-	disableCtrlM  = syscall.ICRNL
-)
-
-//output flags
-const (
-	disableOutputProcessing = syscall.OPOST
+	"strings"
 )
 
 //Keys
@@ -34,16 +14,6 @@ const (
 
 var config Config
 
-//This is the copy of struct from C termios lib
-type Termios struct {
-	Iflag  uint32   //Input mode flags
-	Oflag  uint32   //Output mode flags
-	Cflag  uint32   //Control mode flags
-	Lflag  uint32   // Local mode flags
-	Cc     [20]byte //Control Characters
-	Ispeed uint32   //Input speed
-	Ospeed uint32   //Output speed
-}
 type WinSize struct {
 	Row uint16
 	Col uint16
@@ -86,8 +56,6 @@ func InitEditor() error {
 	//cursor in the top left corner
 	config.CursorX = 0
 	config.CursorY = 0
-	config.numRows = 1
-	config.contentRow.content = []byte("Hello world")
 	return getTerminalSize()
 }
 
@@ -136,110 +104,46 @@ func ReadKey() (int, error) {
 	}
 	return int(buffer[0]), nil
 }
-func DisableRawMode() error {
-	return TcSetAttr(os.Stdin.Fd(), config.originTerm)
-}
-
-func EnableRawMode() error {
-	//store original terminal config before modifing it
-	term, err := TcGetAttr(os.Stdin.Fd())
-	if err != nil {
-		return err
-	}
-	config.originTerm = term
-	//modify current terminal
-	raw := *config.originTerm
-	raw.Lflag &^= syscall.ECHO | readByByte | disableCtrlCZ | disableCtrlV
-	raw.Iflag &^= disableCtrlSQ | disableCtrlM |
-		/*other flags for old terminals*/
-		syscall.BRKINT | syscall.INPCK | syscall.ISTRIP
-	raw.Oflag &^= disableOutputProcessing
-	raw.Cflag &^= syscall.CS8
-	return TcSetAttr(os.Stdin.Fd(), &raw)
-
-}
-
-func TcSetAttr(fd uintptr, termios *Termios) error {
-	_, _, err := syscall.Syscall(
-		syscall.SYS_IOCTL,
-		fd,
-		uintptr(syscall.TCSETS+1),
-		uintptr(unsafe.Pointer(termios)),
-	)
-	if err != 0 {
-		return err
-	}
-	return nil
-}
-
-//Copy of C tcgetattr function
-func TcGetAttr(fd uintptr) (*Termios, error) {
-	terminal := &Termios{}
-	_, _, errCode := syscall.Syscall(
-		syscall.SYS_IOCTL,
-		fd,
-		syscall.TCGETS,
-		uintptr(unsafe.Pointer(terminal)),
-	)
-	if errCode != 0 {
-		return nil, errors.New("Error getting terminal attributes")
-	}
-	return terminal, nil
-}
 
 func drawRows() {
 	for y := 0; y < config.screenRows-1; y++ {
 		//display content of a file
-		if y == config.numRows {
+		if y >= len(config.content) {
+			io.WriteString(
+				os.Stdout,
+				"~",
+			)
+		} else {
 			//if content is bigger than amount of columns then truncate
-			length := len(config.contentRow.content)
+			length := len(config.content[y])
 			if length > config.screenColumns {
 				length = config.screenColumns
 			}
 			io.WriteString(
 				os.Stdout,
-				string(config.contentRow.content)[0:length],
+				config.content[y][0:length],
 			)
-		} else {
-			if y == config.screenRows/3 {
-				io.WriteString(
-					os.Stdout,
-					fmt.Sprintf("readactor editor -- version %s", config.Version()),
-				)
-			} else {
-				io.WriteString(
-					os.Stdout,
-					"~",
-				)
-			}
-			io.WriteString(
-				os.Stdout,
-				"\x1b[K",
-			)
-			if y < config.screenRows-1 {
-				io.WriteString(os.Stdout, "\r\n")
-			}
+		}
+		io.WriteString(
+			os.Stdout,
+			"\x1b[K",
+		)
+		if y < config.screenRows-1 {
+			io.WriteString(os.Stdout, "\r\n")
 		}
 	}
 }
-func getTerminalSize() error {
-	var w WinSize
-	_, _, err := syscall.Syscall(
-		syscall.SYS_IOCTL,
-		os.Stdout.Fd(),
-		syscall.TIOCGWINSZ,
-		uintptr(unsafe.Pointer(&w)),
-	)
-	//move cursor bottom right
-	if err != 0 {
-		return errors.New(
-			fmt.Sprintf(
-				"Error getting terminal size, IOCTL returned %d",
-				err,
-			),
-		)
+
+func OpenFile(name string) error {
+	rawContent, err := os.ReadFile(name)
+	if err != nil {
+		return err
 	}
-	config.screenRows = int(w.Row)
-	config.screenColumns = int(w.Col)
+	parts := strings.FieldsFunc(
+		string(rawContent),
+		func(r rune) bool { return r == '\n' },
+	)
+	config.content = parts
 	return nil
+
 }

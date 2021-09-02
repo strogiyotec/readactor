@@ -6,13 +6,7 @@ type Config struct {
 	screenColumns int      //columns in a screen
 	CursorX       int
 	CursorY       int
-	numRows       int
-	contentRow    EditorRow
-}
-
-type EditorRow struct {
-	numRows int    //number of rows in a text file
-	content []byte //content of a file
+	content       []string
 }
 
 func (c Config) Version() string {

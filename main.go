@@ -3,12 +3,16 @@ package main
 import (
 	"errors"
 	"fmt"
+	"os"
 
 	. "github.com/strogiyotec/readactor/termio"
 )
 
 func main() {
-	fmt.Println("Hello From Readactor")
+	if len(os.Args) == 1 {
+		fmt.Println("Usage: readactor FILE_NAME")
+		return
+	}
 	err := EnableRawMode()
 	if err != nil {
 		fmt.Println(err)
@@ -16,6 +20,11 @@ func main() {
 	}
 	defer DisableRawMode()
 	err = InitEditor()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	err = OpenFile(os.Args[1])
 	if err != nil {
 		fmt.Println(err)
 		return
