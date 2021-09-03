@@ -7,6 +7,8 @@ type Config struct {
 	CursorX       int
 	CursorY       int
 	content       []string
+	rowOffset     int
+	columnOffset  int
 }
 
 func (c Config) Version() string {

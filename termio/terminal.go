@@ -27,11 +27,12 @@ func MoveCursor(key int) {
 			config.CursorX--
 		}
 	case RIGHT:
-		if config.CursorX != config.screenColumns-1 {
+		if len(config.content) > 0 &&
+			config.CursorX < len(config.content[config.CursorY]) {
 			config.CursorX++
 		}
 	case DOWN:
-		if config.CursorY != config.screenRows-1 {
+		if config.CursorY < len(config.content) {
 			config.CursorY++
 		}
 	case TOP:
@@ -41,13 +42,39 @@ func MoveCursor(key int) {
 	}
 }
 
+//enable scrolling
+func editorScroll() {
+	//vertical scrolling
+	if config.CursorY < config.rowOffset {
+		config.rowOffset = config.CursorY
+	}
+	if config.CursorY >= config.rowOffset+config.screenRows {
+		config.rowOffset = config.CursorY - config.screenRows + 1
+	}
+	//horizontal scrolling
+	if config.CursorX < config.columnOffset {
+		config.columnOffset = config.CursorX
+	}
+	if config.CursorX >= config.columnOffset+config.screenColumns {
+		config.columnOffset = config.CursorX - config.screenColumns + 1
+	}
+}
+
 func RefreshScreen() {
+	editorScroll()
 	//hide cursor
 	io.WriteString(os.Stdout, "\x1b[25l")
 	io.WriteString(os.Stdout, "\x1b[H")
 	drawRows()
 	//change cursor position
-	io.WriteString(os.Stdout, fmt.Sprintf("\x1b[%d;%dH", config.CursorY+1, config.CursorX+1))
+	io.WriteString(
+		os.Stdout,
+		fmt.Sprintf(
+			"\x1b[%d;%dH",
+			config.CursorY-config.rowOffset+1,
+			config.CursorX-config.columnOffset+1,
+		),
+	)
 	//show cursor
 	io.WriteString(os.Stdout, "\x1b[25h")
 }
@@ -107,21 +134,26 @@ func ReadKey() (int, error) {
 
 func drawRows() {
 	for y := 0; y < config.screenRows-1; y++ {
+		displayRow := y + config.rowOffset
 		//display content of a file
-		if y >= len(config.content) {
+		if displayRow >= len(config.content) {
 			io.WriteString(
 				os.Stdout,
 				"~",
 			)
 		} else {
-			//if content is bigger than amount of columns then truncate
-			length := len(config.content[y])
-			if length > config.screenColumns {
-				length = config.screenColumns
+			//offset columns
+			displayLength := len(config.content[displayRow]) - config.columnOffset
+			//if cursor is moving left and became negative
+			if displayLength < 0 {
+				displayLength = 0
+			}
+			if displayLength > config.screenColumns {
+				displayLength = config.screenColumns
 			}
 			io.WriteString(
 				os.Stdout,
-				config.content[y][0:length],
+				config.content[displayRow][config.columnOffset:displayLength-1],
 			)
 		}
 		io.WriteString(
