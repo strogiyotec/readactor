@@ -9,7 +9,9 @@ import (
 
 //Keys
 const (
-	CtrlQ = 'q' & 0x1f
+	CtrlQ  = 'q' & 0x1f
+	ZERO   = '0' //in vim zero moves to the beginning of a line
+	DOLLAR = '$'
 )
 
 var config Config
@@ -26,6 +28,10 @@ func MoveCursor(key int) {
 		if config.CursorX != 0 {
 			config.CursorX--
 		}
+	case ZERO:
+		config.CursorX = 0
+	case DOLLAR:
+		config.CursorX = len(config.content[config.CursorY])
 	case RIGHT:
 		if len(config.content) > 0 &&
 			config.CursorX < len(config.content[config.CursorY]) {
@@ -39,6 +45,13 @@ func MoveCursor(key int) {
 		if config.CursorY != 0 {
 			config.CursorY--
 		}
+	}
+	rowLen := 0
+	if config.CursorY < config.screenColumns {
+		rowLen = len(config.content[config.CursorY])
+	}
+	if config.CursorX > rowLen {
+		config.CursorX = rowLen
 	}
 }
 
@@ -129,6 +142,8 @@ func ReadKey() (int, error) {
 			}
 		}
 	}
+	str := fmt.Sprintf("%d\r\n", buffer[0])
+	os.WriteFile("/tmp/readactor/test.txt", []byte(str), 0666)
 	return int(buffer[0]), nil
 }
 
