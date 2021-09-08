@@ -7,6 +7,11 @@ import (
 	"strings"
 )
 
+//Config
+const (
+	TABS = 8
+)
+
 //Keys
 const (
 	CtrlQ  = 'q' & 0x1f
@@ -27,15 +32,22 @@ func MoveCursor(key int) {
 	case LEFT:
 		if config.CursorX != 0 {
 			config.CursorX--
+		} else if config.CursorY > 0 {
+			config.CursorY--
+			config.CursorX = len(config.content[config.CursorY])
 		}
 	case ZERO:
 		config.CursorX = 0
 	case DOLLAR:
 		config.CursorX = len(config.content[config.CursorY])
 	case RIGHT:
-		if len(config.content) > 0 &&
-			config.CursorX < len(config.content[config.CursorY]) {
-			config.CursorX++
+		if config.CursorY < config.screenRows {
+			if config.CursorX < len(config.content[config.CursorY]) {
+				config.CursorX++
+			} else if config.CursorX == len(config.content[config.CursorY]) {
+				config.CursorY++
+				config.CursorX = 0
+			}
 		}
 	case DOWN:
 		if config.CursorY < len(config.content) {
@@ -47,7 +59,7 @@ func MoveCursor(key int) {
 		}
 	}
 	rowLen := 0
-	if config.CursorY < config.screenColumns {
+	if config.CursorY < config.screenRows {
 		rowLen = len(config.content[config.CursorY])
 	}
 	if config.CursorX > rowLen {
@@ -57,6 +69,10 @@ func MoveCursor(key int) {
 
 //enable scrolling
 func editorScroll() {
+	config.renderX = 0
+	if config.CursorY < len(config.content) {
+		calculateRenderIndex()
+	}
 	//vertical scrolling
 	if config.CursorY < config.rowOffset {
 		config.rowOffset = config.CursorY
@@ -65,11 +81,11 @@ func editorScroll() {
 		config.rowOffset = config.CursorY - config.screenRows + 1
 	}
 	//horizontal scrolling
-	if config.CursorX < config.columnOffset {
-		config.columnOffset = config.CursorX
+	if config.renderX < config.columnOffset {
+		config.columnOffset = config.renderX
 	}
 	if config.CursorX >= config.columnOffset+config.screenColumns {
-		config.columnOffset = config.CursorX - config.screenColumns + 1
+		config.columnOffset = config.renderX - config.screenColumns + 1
 	}
 }
 
@@ -85,11 +101,11 @@ func RefreshScreen() {
 		fmt.Sprintf(
 			"\x1b[%d;%dH",
 			config.CursorY-config.rowOffset+1,
-			config.CursorX-config.columnOffset+1,
+			config.renderX-config.columnOffset+1,
 		),
 	)
 	//show cursor
-	io.WriteString(os.Stdout, "\x1b[25h")
+	io.WriteString(os.Stdout, "\x1b[?25h")
 }
 
 func InitEditor() error {
@@ -187,7 +203,7 @@ func tabAwareString(line string) string {
 	var builder strings.Builder
 	for _, c := range line {
 		if c == '\t' {
-			builder.WriteString(strings.Repeat(" ", 8))
+			builder.WriteString(strings.Repeat(" ", TABS))
 		} else {
 			builder.WriteRune(c)
 		}
@@ -207,4 +223,17 @@ func OpenFile(name string) error {
 	config.content = parts
 	return nil
 
+}
+
+//calculate cursor position with tabs in mind
+func calculateRenderIndex() {
+	row := config.content[config.CursorY]
+	renderX := 0
+	for i := 0; i < config.CursorX; i++ {
+		if row[i] == '\t' {
+			renderX += (TABS - 1) - (renderX % TABS)
+		}
+		renderX++
+	}
+	config.renderX = renderX
 }
