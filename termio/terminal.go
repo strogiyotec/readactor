@@ -150,15 +150,16 @@ func ReadKey() (int, error) {
 func drawRows() {
 	for y := 0; y < config.screenRows-1; y++ {
 		displayRow := y + config.rowOffset
-		//display content of a file
+		//for empty lines display ~
 		if displayRow >= len(config.content) {
 			io.WriteString(
 				os.Stdout,
 				"~",
 			)
 		} else {
+			line := tabAwareString(config.content[displayRow])
 			//offset columns
-			displayLength := len(config.content[displayRow]) - config.columnOffset
+			displayLength := len(line) - config.columnOffset
 			//if cursor is moving left and became negative
 			if displayLength < 0 {
 				displayLength = 0
@@ -168,7 +169,7 @@ func drawRows() {
 			}
 			io.WriteString(
 				os.Stdout,
-				config.content[displayRow][config.columnOffset:displayLength-1],
+				line[config.columnOffset:config.columnOffset+displayLength],
 			)
 		}
 		io.WriteString(
@@ -179,6 +180,19 @@ func drawRows() {
 			io.WriteString(os.Stdout, "\r\n")
 		}
 	}
+}
+
+//return given string with spaces as a tab
+func tabAwareString(line string) string {
+	var builder strings.Builder
+	for _, c := range line {
+		if c == '\t' {
+			builder.WriteString(strings.Repeat(" ", 8))
+		} else {
+			builder.WriteRune(c)
+		}
+	}
+	return builder.String()
 }
 
 func OpenFile(name string) error {
