@@ -6,10 +6,11 @@ type Config struct {
 	screenColumns int      //columns in a screen
 	CursorX       int      //current x position
 	CursorY       int      //current y position
-	content       []string
+	rows          []editorRow
 	rowOffset     int
 	columnOffset  int
 	renderX       int //of there are tabs in the file then renderX is bigger than currentX
+	numberRows    int
 }
 
 func (c Config) Version() string {

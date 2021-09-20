@@ -37,20 +37,6 @@ func main() {
 			return
 		}
 	}
-	//buffer := make([]byte, 1)
-	//for cc, err := os.Stdin.Read(buffer); err == nil && cc == 1; cc, err = os.Stdin.Read(buffer) {
-	//	var r rune
-	//	r = rune(buffer[0])
-	//	//quit on ctrl q
-	//	if r == CtrlQ {
-	//		break
-	//	}
-	//	if strconv.IsPrint(r) {
-	//		fmt.Printf("%d  %c\r\n", buffer[0], r)
-	//	} else {
-	//		fmt.Printf("%d\r\n", buffer[0])
-	//	}
-	//}
 }
 
 func processKeypress() error {

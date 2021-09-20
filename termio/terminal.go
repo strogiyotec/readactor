@@ -12,6 +12,13 @@ const (
 	TABS = 8
 )
 
+type editorRow struct {
+	size        int    //actual size
+	renderSize  int    //size of rendered row with tabs
+	row         []byte // actual row content
+	renderedRow []byte // row rendered with tabs
+}
+
 //Keys
 const (
 	CtrlQ  = 'q' & 0x1f
@@ -34,7 +41,8 @@ func MoveCursor(key int) {
 			config.CursorX--
 		} else if config.CursorY > 0 {
 			config.CursorY--
-			config.CursorX = len(config.content[config.CursorY])
+			renderLine := tabAwareString(config.content[config.CursorY])
+			config.CursorX = len(renderLine)
 		}
 	case ZERO:
 		config.CursorX = 0
@@ -42,9 +50,10 @@ func MoveCursor(key int) {
 		config.CursorX = len(config.content[config.CursorY])
 	case RIGHT:
 		if config.CursorY < config.screenRows {
-			if config.CursorX < len(config.content[config.CursorY]) {
+			renderLine := tabAwareString(config.content[config.CursorY])
+			if config.CursorX < len(renderLine) {
 				config.CursorX++
-			} else if config.CursorX == len(config.content[config.CursorY]) {
+			} else if config.CursorX == len(renderLine) {
 				config.CursorY++
 				config.CursorX = 0
 			}
@@ -84,7 +93,7 @@ func editorScroll() {
 	if config.renderX < config.columnOffset {
 		config.columnOffset = config.renderX
 	}
-	if config.CursorX >= config.columnOffset+config.screenColumns {
+	if config.renderX >= config.columnOffset+config.screenColumns {
 		config.columnOffset = config.renderX - config.screenColumns + 1
 	}
 }
@@ -164,16 +173,16 @@ func ReadKey() (int, error) {
 }
 
 func drawRows() {
-	for y := 0; y < config.screenRows-1; y++ {
-		displayRow := y + config.rowOffset
+	for y := 0; y < config.screenRows; y++ {
+		fileRow := y + config.rowOffset
 		//for empty lines display ~
-		if displayRow >= len(config.content) {
+		if fileRow >= len(config.content) {
 			io.WriteString(
 				os.Stdout,
 				"~",
 			)
 		} else {
-			line := tabAwareString(config.content[displayRow])
+			line := tabAwareString(config.content[fileRow])
 			//offset columns
 			displayLength := len(line) - config.columnOffset
 			//if cursor is moving left and became negative
@@ -220,16 +229,45 @@ func OpenFile(name string) error {
 		string(rawContent),
 		func(r rune) bool { return r == '\n' },
 	)
-	config.content = parts
+	for _, row := range parts {
+		line := []byte(row)
+		for c := line[len(line)-1]; len(line) > 0 && (c == '\n' || c == '\r'); {
+			line = line[:len(line)-1]
+			if len(line) > 0 {
+				c = line[len(line)-1]
+			}
+		}
+		appendRow(line)
+	}
 	return nil
+}
 
+func appendRow(line []byte) {
+	var row editorRow
+	row.row = line
+	row.size = len(line)
+	config.rows = append(config.rows, row)
+	tabAwareRow(&config.rows[config.numberRows])
+	config.numberRows++
+}
+
+//render the editor row with proper amount of tabs in the end
+//and in the beginning
+func tabAwareRow(eRow *editorRow) {
+	tabs := 0
+	for _, c := range eRow.row {
+		if c == '\t' {
+			tabs++
+		}
+	}
+	eRow.renderedRow = make([]byte, eRow.size+tabs*(TABS-1))
 }
 
 //calculate cursor position with tabs in mind
 func calculateRenderIndex() {
 	row := config.content[config.CursorY]
 	renderX := 0
-	for i := 0; i < config.CursorX; i++ {
+	for i := 0; i < config.CursorX && i < len(config.content[config.CursorY]); i++ {
 		if row[i] == '\t' {
 			renderX += (TABS - 1) - (renderX % TABS)
 		}
