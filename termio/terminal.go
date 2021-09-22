@@ -254,6 +254,7 @@ func appendRow(line []byte) {
 //render the editor row with proper amount of tabs in the end
 //and in the beginning
 func tabAwareRow(eRow *editorRow) {
+	//count tabs
 	tabs := 0
 	for _, c := range eRow.row {
 		if c == '\t' {
@@ -261,6 +262,22 @@ func tabAwareRow(eRow *editorRow) {
 		}
 	}
 	eRow.renderedRow = make([]byte, eRow.size+tabs*(TABS-1))
+	//now replace all tabs with spaces
+	idx := 0
+	for _, c := range eRow.row {
+		if c == '\t' {
+			eRow.renderedRow[idx] = ' '
+			idx++
+			for idx%TABS != 0 {
+				eRow.renderedRow[idx] = ' '
+				idx++
+			}
+		} else {
+			eRow.renderedRow[idx] = c
+			idx++
+		}
+	}
+	eRow.renderSize = idx
 }
 
 //calculate cursor position with tabs in mind
