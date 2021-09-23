@@ -41,25 +41,23 @@ func MoveCursor(key int) {
 			config.CursorX--
 		} else if config.CursorY > 0 {
 			config.CursorY--
-			renderLine := tabAwareString(config.content[config.CursorY])
-			config.CursorX = len(renderLine)
+			config.CursorX = config.rows[config.CursorY].renderSize
 		}
 	case ZERO:
 		config.CursorX = 0
 	case DOLLAR:
-		config.CursorX = len(config.content[config.CursorY])
+		config.CursorX = config.rows[config.CursorY].renderSize
 	case RIGHT:
 		if config.CursorY < config.screenRows {
-			renderLine := tabAwareString(config.content[config.CursorY])
-			if config.CursorX < len(renderLine) {
+			if config.CursorX < config.rows[config.CursorY].renderSize {
 				config.CursorX++
-			} else if config.CursorX == len(renderLine) {
+			} else if config.CursorX == config.rows[config.CursorY].renderSize {
 				config.CursorY++
 				config.CursorX = 0
 			}
 		}
 	case DOWN:
-		if config.CursorY < len(config.content) {
+		if config.CursorY < config.numberRows {
 			config.CursorY++
 		}
 	case TOP:
@@ -68,8 +66,8 @@ func MoveCursor(key int) {
 		}
 	}
 	rowLen := 0
-	if config.CursorY < config.screenRows {
-		rowLen = len(config.content[config.CursorY])
+	if config.CursorY < config.numberRows {
+		rowLen = config.rows[config.CursorY].renderSize
 	}
 	if config.CursorX > rowLen {
 		config.CursorX = rowLen
@@ -79,8 +77,8 @@ func MoveCursor(key int) {
 //enable scrolling
 func editorScroll() {
 	config.renderX = 0
-	if config.CursorY < len(config.content) {
-		calculateRenderIndex()
+	if config.CursorY < config.numberRows {
+		config.renderX
 	}
 	//vertical scrolling
 	if config.CursorY < config.rowOffset {
@@ -278,17 +276,4 @@ func tabAwareRow(eRow *editorRow) {
 		}
 	}
 	eRow.renderSize = idx
-}
-
-//calculate cursor position with tabs in mind
-func calculateRenderIndex() {
-	row := config.content[config.CursorY]
-	renderX := 0
-	for i := 0; i < config.CursorX && i < len(config.content[config.CursorY]); i++ {
-		if row[i] == '\t' {
-			renderX += (TABS - 1) - (renderX % TABS)
-		}
-		renderX++
-	}
-	config.renderX = renderX
 }
