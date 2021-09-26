@@ -1,16 +1,16 @@
 package termio
 
 type Config struct {
-	originTerm    *Termios //keep original terminal settings and restore them on exit
-	screenRows    int      //rows in a screen
-	screenColumns int      //columns in a screen
-	CursorX       int      //current x position
-	CursorY       int      //current y position
-	rows          []editorRow
-	rowOffset     int
-	columnOffset  int
-	renderX       int //of there are tabs in the file then renderX is bigger than currentX
-	numberRows    int
+	cx          int
+	cy          int
+	rx          int
+	rowoff      int
+	coloff      int
+	screenRows  int
+	screenCols  int
+	numRows     int
+	rows        []editorRow
+	origTermios *Termios
 }
 
 func (c Config) Version() string {

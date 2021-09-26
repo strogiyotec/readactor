@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"strings"
 )
@@ -14,10 +15,10 @@ const (
 )
 
 type editorRow struct {
-	size        int    //actual size
-	renderSize  int    //size of rendered row with tabs
-	row         []byte // actual row content
-	renderedRow []byte // row rendered with tabs
+	size   int
+	rsize  int
+	chars  []byte
+	render []byte
 }
 
 //Keys
@@ -34,51 +35,47 @@ type WinSize struct {
 	Col uint16
 }
 
-//Move cursor according to vim keys
-func MoveCursor(key int) {
+func EditorMoveCursor(key int) {
 	switch key {
-	case LEFT:
-		if config.CursorX != 0 {
-			config.CursorX--
-		} else if config.CursorY > 0 {
-			config.CursorY--
-			config.CursorX = config.rows[config.CursorY].renderSize
+	case ARROW_LEFT:
+		if config.cx != 0 {
+			config.cx--
+		} else if config.cy > 0 {
+			config.cy--
+			config.cx = config.rows[config.cy].rsize
 		}
-	case ZERO:
-		config.CursorX = 0
-	case DOLLAR:
-		config.CursorX = config.rows[config.CursorY].renderSize
-	case RIGHT:
-		if config.CursorY < config.screenRows {
-			if config.CursorX < config.rows[config.CursorY].renderSize {
-				config.CursorX++
-			} else if config.CursorX == config.rows[config.CursorY].renderSize {
-				config.CursorY++
-				config.CursorX = 0
+	case ARROW_RIGHT:
+		if config.cy < config.numRows {
+			if config.cx < config.rows[config.cy].rsize {
+				config.cx++
+			} else if config.cx == config.rows[config.cy].rsize {
+				config.cy++
+				config.cx = 0
 			}
 		}
-	case DOWN:
-		if config.CursorY < config.numberRows {
-			config.CursorY++
+	case ARROW_UP:
+		if config.cy != 0 {
+			config.cy--
 		}
-	case TOP:
-		if config.CursorY != 0 {
-			config.CursorY--
+	case ARROW_DOWN:
+		if config.cy < config.numRows {
+			config.cy++
 		}
 	}
-	rowLen := 0
-	if config.CursorY < config.numberRows {
-		rowLen = config.rows[config.CursorY].renderSize
+
+	rowlen := 0
+	if config.cy < config.numRows {
+		rowlen = config.rows[config.cy].rsize
 	}
-	if config.CursorX > rowLen {
-		config.CursorX = rowLen
+	if config.cx > rowlen {
+		config.cx = rowlen
 	}
 }
 
-func toRenderIndex(row *editorRow, cursorX int) int {
+func editorRowCxToRx(row *editorRow, cx int) int {
 	rx := 0
-	for j := 0; j < row.size && j < cursorX; j++ {
-		if row.row[j] == '\t' {
+	for j := 0; j < row.size && j < cx; j++ {
+		if row.chars[j] == '\t' {
 			rx += ((TABS - 1) - (rx % TABS))
 		}
 		rx++
@@ -88,50 +85,56 @@ func toRenderIndex(row *editorRow, cursorX int) int {
 
 //enable scrolling
 func editorScroll() {
-	config.renderX = 0
+	config.rx = 0
 
-	if config.CursorY < config.numberRows {
-		config.renderX = toRenderIndex(&(config.rows[config.CursorY]), config.CursorX)
+	if config.cy < config.numRows {
+		config.rx = editorRowCxToRx(&(config.rows[config.cy]), config.cx)
 	}
-	//vertical scrolling
-	if config.CursorY < config.rowOffset {
-		config.rowOffset = config.CursorY
+
+	if config.cy < config.rowoff {
+		config.rowoff = config.cy
 	}
-	if config.CursorY >= config.rowOffset+config.screenRows {
-		config.rowOffset = config.CursorY - config.screenRows + 1
+	if config.cy >= config.rowoff+config.screenRows {
+		config.rowoff = config.cy - config.screenRows + 1
 	}
-	//horizontal scrolling
-	if config.renderX < config.columnOffset {
-		config.columnOffset = config.renderX
+	if config.rx < config.coloff {
+		config.coloff = config.rx
 	}
-	if config.renderX >= config.columnOffset+config.screenColumns {
-		config.columnOffset = config.renderX - config.screenColumns + 1
+	if config.rx >= config.coloff+config.screenCols {
+		config.coloff = config.rx - config.screenCols + 1
 	}
 }
 
+type abuf struct {
+	buf []byte
+}
+
+func (p abuf) String() string {
+	return string(p.buf)
+}
+
+func (p *abuf) abAppend(s string) {
+	p.buf = append(p.buf, []byte(s)...)
+}
+
+func (p *abuf) abAppendBytes(b []byte) {
+	p.buf = append(p.buf, b...)
+}
 func RefreshScreen() {
 	editorScroll()
-	//hide cursor
-	io.WriteString(os.Stdout, "\x1b[25l")
-	io.WriteString(os.Stdout, "\x1b[H")
-	drawRows()
-	//change cursor position
-	io.WriteString(
-		os.Stdout,
-		fmt.Sprintf(
-			"\x1b[%d;%dH",
-			config.CursorY-config.rowOffset+1,
-			config.renderX-config.columnOffset+1,
-		),
-	)
-	//show cursor
-	io.WriteString(os.Stdout, "\x1b[?25h")
+	var ab abuf
+	ab.abAppend("\x1b[25l")
+	ab.abAppend("\x1b[H")
+	drawRows(&ab)
+	ab.abAppend(fmt.Sprintf("\x1b[%d;%dH", (config.cy-config.rowoff)+1, (config.rx-config.coloff)+1))
+	ab.abAppend("\x1b[?25h")
+	_, e := io.WriteString(os.Stdout, ab.String())
+	if e != nil {
+		log.Fatal(e)
+	}
 }
 
 func InitEditor() error {
-	//cursor in the top left corner
-	config.CursorX = 0
-	config.CursorY = 0
 	return getTerminalSize()
 }
 
@@ -178,43 +181,27 @@ func ReadKey() (int, error) {
 			}
 		}
 	}
-	str := fmt.Sprintf("%d\r\n", buffer[0])
-	os.WriteFile("/tmp/readactor/test.txt", []byte(str), 0666)
 	return int(buffer[0]), nil
 }
 
-func drawRows() {
+func drawRows(ab *abuf) {
 	for y := 0; y < config.screenRows; y++ {
-		fileRow := y + config.rowOffset
-		//for empty lines display ~
-		if fileRow >= config.numberRows {
-			io.WriteString(
-				os.Stdout,
-				"~",
-			)
+		filerow := y + config.rowoff
+		if filerow >= config.numRows {
+			ab.abAppend("~")
 		} else {
-			len := config.rows[fileRow].renderSize - config.columnOffset
+			len := config.rows[filerow].rsize - config.coloff
 			if len < 0 {
 				len = 0
 			}
-			if len > config.screenColumns {
-				len = config.screenColumns
+			if len > config.screenCols {
+				len = config.screenCols
 			}
-
-			io.WriteString(
-				os.Stdout,
-				string(
-					config.rows[fileRow].
-						renderedRow[config.columnOffset:config.columnOffset+len],
-				),
-			)
+			ab.abAppendBytes(config.rows[filerow].render[config.coloff : config.coloff+len])
 		}
-		io.WriteString(
-			os.Stdout,
-			"\x1b[K",
-		)
+		ab.abAppend("\x1b[K")
 		if y < config.screenRows-1 {
-			io.WriteString(os.Stdout, "\r\n")
+			ab.abAppend("\r\n")
 		}
 	}
 }
@@ -248,7 +235,7 @@ func OpenFile(name string) error {
 				c = line[len(line)-1]
 			}
 		}
-		appendRow(line)
+		editorAppendRow(line)
 	}
 
 	if err != nil && err != io.EOF {
@@ -257,40 +244,167 @@ func OpenFile(name string) error {
 	return nil
 }
 
-func appendRow(line []byte) {
-	var row editorRow
-	row.row = line
-	row.size = len(line)
-	config.rows = append(config.rows, row)
-	tabAwareRow(&config.rows[config.numberRows])
-	config.numberRows++
+func editorAppendRow(s []byte) {
+	var r editorRow
+	r.chars = s
+	r.size = len(s)
+	config.rows = append(config.rows, r)
+	editorUpdateRow(&config.rows[config.numRows])
+	config.numRows++
 }
 
-//render the editor row with proper amount of tabs in the end
-//and in the beginning
-func tabAwareRow(eRow *editorRow) {
-	//count tabs
+func editorUpdateRow(row *editorRow) {
 	tabs := 0
-	for _, c := range eRow.row {
+	for _, c := range row.chars {
 		if c == '\t' {
 			tabs++
 		}
 	}
-	eRow.renderedRow = make([]byte, eRow.size+tabs*(TABS-1))
-	//now replace all tabs with spaces
+	row.render = make([]byte, row.size+tabs*(TABS-1))
+
 	idx := 0
-	for _, c := range eRow.row {
+	for _, c := range row.chars {
 		if c == '\t' {
-			eRow.renderedRow[idx] = ' '
+			row.render[idx] = ' '
 			idx++
-			for idx%TABS != 0 {
-				eRow.renderedRow[idx] = ' '
+			for (idx % TABS) != 0 {
+				row.render[idx] = ' '
 				idx++
 			}
 		} else {
-			eRow.renderedRow[idx] = c
+			row.render[idx] = c
 			idx++
 		}
 	}
-	eRow.renderSize = idx
+	row.rsize = idx
+}
+
+func EditorReadKey() int {
+	var buffer [1]byte
+	var cc int
+	var err error
+	for cc, err = os.Stdin.Read(buffer[:]); cc != 1; cc, err = os.Stdin.Read(buffer[:]) {
+	}
+	if err != nil {
+		return -1
+	}
+	if buffer[0] == '\x1b' {
+		var seq [2]byte
+		if cc, _ = os.Stdin.Read(seq[:]); cc != 2 {
+			return '\x1b'
+		}
+
+		if seq[0] == '[' {
+			if seq[1] >= '0' && seq[1] <= '9' {
+				if cc, err = os.Stdin.Read(buffer[:]); cc != 1 {
+					return '\x1b'
+				}
+				if buffer[0] == '~' {
+					switch seq[1] {
+					case '1':
+						return HOME_KEY
+					case '3':
+						return DEL_KEY
+					case '4':
+						return END_KEY
+					case '5':
+						return PAGE_UP
+					case '6':
+						return PAGE_DOWN
+					case '7':
+						return HOME_KEY
+					case '8':
+						return END_KEY
+					}
+				}
+				// XXX - what happens here?
+			} else {
+				switch seq[1] {
+				case 'A':
+					return ARROW_UP
+				case 'B':
+					return ARROW_DOWN
+				case 'C':
+					return ARROW_RIGHT
+				case 'D':
+					return ARROW_LEFT
+				case 'H':
+					return HOME_KEY
+				case 'F':
+					return END_KEY
+				}
+			}
+		} else if seq[0] == '0' {
+			switch seq[1] {
+			case 'H':
+				return HOME_KEY
+			case 'F':
+				return END_KEY
+			}
+		}
+
+		return '\x1b'
+	}
+	return int(buffer[0])
+}
+func EditorProcessKeypress() {
+	c := EditorReadKey()
+	switch c {
+	case ('q' & 0x1f):
+		io.WriteString(os.Stdout, "\x1b[2J")
+		io.WriteString(os.Stdout, "\x1b[H")
+		DisableRawMode()
+		os.Exit(0)
+	case HOME_KEY:
+		config.cx = 0
+	case END_KEY:
+		config.cx = config.screenCols - 1
+	case PAGE_UP, PAGE_DOWN:
+		dir := ARROW_DOWN
+		if c == PAGE_UP {
+			dir = ARROW_UP
+		}
+		for times := config.screenRows; times > 0; times-- {
+			editorMoveCursor(dir)
+		}
+	case ARROW_UP, ARROW_DOWN, ARROW_LEFT, ARROW_RIGHT:
+		editorMoveCursor(c)
+	}
+}
+
+func editorMoveCursor(key int) {
+	switch key {
+	case ARROW_LEFT:
+		if config.cx != 0 {
+			config.cx--
+		} else if config.cy > 0 {
+			config.cy--
+			config.cx = config.rows[config.cy].rsize
+		}
+	case ARROW_RIGHT:
+		if config.cy < config.numRows {
+			if config.cx < config.rows[config.cy].rsize {
+				config.cx++
+			} else if config.cx == config.rows[config.cy].rsize {
+				config.cy++
+				config.cx = 0
+			}
+		}
+	case ARROW_UP:
+		if config.cy != 0 {
+			config.cy--
+		}
+	case ARROW_DOWN:
+		if config.cy < config.numRows {
+			config.cy++
+		}
+	}
+
+	rowlen := 0
+	if config.cy < config.numRows {
+		rowlen = config.rows[config.cy].rsize
+	}
+	if config.cx > rowlen {
+		config.cx = rowlen
+	}
 }

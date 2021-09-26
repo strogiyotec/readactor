@@ -65,7 +65,7 @@ func TcGetAttr(fd uintptr) (*Termios, error) {
 	return terminal, nil
 }
 func DisableRawMode() error {
-	return TcSetAttr(os.Stdin.Fd(), config.originTerm)
+	return TcSetAttr(os.Stdin.Fd(), config.origTermios)
 }
 
 func EnableRawMode() error {
@@ -74,9 +74,9 @@ func EnableRawMode() error {
 	if err != nil {
 		return err
 	}
-	config.originTerm = term
+	config.origTermios = term
 	//modify current terminal
-	raw := *config.originTerm
+	raw := *config.origTermios
 	raw.Lflag &^= syscall.ECHO | readByByte | disableCtrlCZ | disableCtrlV
 	raw.Iflag &^= disableCtrlSQ | disableCtrlM |
 		/*other flags for old terminals*/
@@ -104,6 +104,6 @@ func getTerminalSize() error {
 		)
 	}
 	config.screenRows = int(w.Row)
-	config.screenColumns = int(w.Col)
+	config.screenCols = int(w.Col)
 	return nil
 }
