@@ -1,6 +1,7 @@
 package termio
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -74,11 +75,23 @@ func MoveCursor(key int) {
 	}
 }
 
+func toRenderIndex(row *editorRow, cursorX int) int {
+	rx := 0
+	for j := 0; j < row.size && j < cursorX; j++ {
+		if row.row[j] == '\t' {
+			rx += ((TABS - 1) - (rx % TABS))
+		}
+		rx++
+	}
+	return rx
+}
+
 //enable scrolling
 func editorScroll() {
 	config.renderX = 0
+
 	if config.CursorY < config.numberRows {
-		config.renderX
+		config.renderX = toRenderIndex(&(config.rows[config.CursorY]), config.CursorX)
 	}
 	//vertical scrolling
 	if config.CursorY < config.rowOffset {
@@ -174,25 +187,26 @@ func drawRows() {
 	for y := 0; y < config.screenRows; y++ {
 		fileRow := y + config.rowOffset
 		//for empty lines display ~
-		if fileRow >= len(config.content) {
+		if fileRow >= config.numberRows {
 			io.WriteString(
 				os.Stdout,
 				"~",
 			)
 		} else {
-			line := tabAwareString(config.content[fileRow])
-			//offset columns
-			displayLength := len(line) - config.columnOffset
-			//if cursor is moving left and became negative
-			if displayLength < 0 {
-				displayLength = 0
+			len := config.rows[fileRow].renderSize - config.columnOffset
+			if len < 0 {
+				len = 0
 			}
-			if displayLength > config.screenColumns {
-				displayLength = config.screenColumns
+			if len > config.screenColumns {
+				len = config.screenColumns
 			}
+
 			io.WriteString(
 				os.Stdout,
-				line[config.columnOffset:config.columnOffset+displayLength],
+				string(
+					config.rows[fileRow].
+						renderedRow[config.columnOffset:config.columnOffset+len],
+				),
 			)
 		}
 		io.WriteString(
@@ -219,16 +233,15 @@ func tabAwareString(line string) string {
 }
 
 func OpenFile(name string) error {
-	rawContent, err := os.ReadFile(name)
+	fd, err := os.Open(name)
 	if err != nil {
 		return err
 	}
-	parts := strings.FieldsFunc(
-		string(rawContent),
-		func(r rune) bool { return r == '\n' },
-	)
-	for _, row := range parts {
-		line := []byte(row)
+	defer fd.Close()
+	fp := bufio.NewReader(fd)
+
+	for line, err := fp.ReadBytes('\n'); err == nil; line, err = fp.ReadBytes('\n') {
+		// Trim trailing newlines and carriage returns
 		for c := line[len(line)-1]; len(line) > 0 && (c == '\n' || c == '\r'); {
 			line = line[:len(line)-1]
 			if len(line) > 0 {
@@ -236,6 +249,10 @@ func OpenFile(name string) error {
 			}
 		}
 		appendRow(line)
+	}
+
+	if err != nil && err != io.EOF {
+		return err
 	}
 	return nil
 }
