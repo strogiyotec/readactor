@@ -1,6 +1,9 @@
 package termio
 
-type Config struct {
+const READACTOR_VERSION = "0.0.1"
+const TAB_SPACE = 8
+
+type EditorConfig struct {
 	cx          int
 	cy          int
 	rx          int
@@ -9,10 +12,6 @@ type Config struct {
 	screenRows  int
 	screenCols  int
 	numRows     int
-	rows        []editorRow
+	rows        []erow
 	origTermios *Termios
-}
-
-func (c Config) Version() string {
-	return "0.0.1"
 }
