@@ -70,5 +70,4 @@ func getWindowSize(rows *int, cols *int) int {
 		*cols = int(w.Col)
 		return 0
 	}
-	return -1
 }
