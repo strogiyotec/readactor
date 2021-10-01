@@ -313,7 +313,14 @@ func EditorRefreshScreen() {
 	ab.abAppend("\x1b[H")
 	editorDrawRows(&ab)
 	editorDrawStatusBar(&ab)
-	ab.abAppend(fmt.Sprintf("\x1b[%d;%dH", (Config.cy-Config.rowoff)+1, (Config.rx-Config.coloff)+1))
+	editorDrawMessageBar(&ab)
+	ab.abAppend(
+		fmt.Sprintf(
+			"\x1b[%d;%dH",
+			(Config.cy-Config.rowoff)+1,
+			(Config.rx-Config.coloff)+1,
+		),
+	)
 	ab.abAppend("\x1b[?25h")
 	_, e := io.WriteString(os.Stdout, ab.String())
 	if e != nil {
@@ -340,6 +347,15 @@ func editorDrawRows(ab *abuf) {
 		ab.abAppend("\x1b[K")
 		ab.abAppend("\r\n")
 	}
+}
+
+func editorDrawMessageBar(ab *abuf) {
+	ab.abAppend("\x1b[K") //clear status bar first
+	msgLength := len(Config.statusMessage)
+	if msgLength > Config.screenCols {
+		msgLength = Config.screenCols
+	}
+	ab.abAppend(Config.statusMessage[:msgLength])
 }
 
 func editorDrawStatusBar(ab *abuf) {
@@ -370,14 +386,14 @@ func editorDrawStatusBar(ab *abuf) {
 		}
 	}
 	ab.abAppend("\x1b[m") //switch back to normal format
+	ab.abAppend("\r\n")   // room for status message
 }
 
-/*** init ***/
-
 func InitEditor() {
-	// Initialization a la C not necessary.
 	if getWindowSize(&Config.screenRows, &Config.screenCols) == -1 {
 		die(fmt.Errorf("couldn't get screen size"))
 	}
-	Config.screenRows--
+	//save last two rows for line number and status message
+	Config.screenRows -= 2
+	Config.statusMessage = "Press Ctrl-Q to quit"
 }
