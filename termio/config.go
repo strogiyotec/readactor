@@ -14,4 +14,5 @@ type EditorConfig struct {
 	numRows     int
 	rows        []erow
 	origTermios *Termios
+	fileName    string
 }

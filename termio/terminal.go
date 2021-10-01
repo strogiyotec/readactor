@@ -177,6 +177,7 @@ func editorAppendRow(s []byte) {
 /*** file I/O ***/
 
 func EditorOpen(filename string) {
+	Config.fileName = filename
 	fd, err := os.Open(filename)
 	if err != nil {
 		die(err)
@@ -311,6 +312,7 @@ func EditorRefreshScreen() {
 	ab.abAppend("\x1b[25l")
 	ab.abAppend("\x1b[H")
 	editorDrawRows(&ab)
+	editorDrawStatusBar(&ab)
 	ab.abAppend(fmt.Sprintf("\x1b[%d;%dH", (Config.cy-Config.rowoff)+1, (Config.rx-Config.coloff)+1))
 	ab.abAppend("\x1b[?25h")
 	_, e := io.WriteString(os.Stdout, ab.String())
@@ -332,13 +334,42 @@ func editorDrawRows(ab *abuf) {
 			if len > Config.screenCols {
 				len = Config.screenCols
 			}
-			ab.abAppendBytes(Config.rows[filerow].render[Config.coloff : Config.coloff+len])
+			rindex := Config.coloff + len
+			ab.abAppendBytes(Config.rows[filerow].render[Config.coloff:rindex])
 		}
 		ab.abAppend("\x1b[K")
-		if y < Config.screenRows-1 {
-			ab.abAppend("\r\n")
+		ab.abAppend("\r\n")
+	}
+}
+
+func editorDrawStatusBar(ab *abuf) {
+	ab.abAppend("\x1b[7m") //switch to inverted colors
+	statusBar := fmt.Sprintf(
+		"%.20s - %d lines",
+		Config.fileName,
+		Config.numRows,
+	)
+	length := len(statusBar)
+	if length > Config.screenCols {
+		length = Config.screenCols
+	}
+	lineNumberBar := fmt.Sprintf(
+		"%d/%d",
+		Config.cy+1, //because line number is zero indexed
+		Config.numRows,
+	)
+	ab.abAppend(statusBar[:length])
+	for length < Config.screenCols {
+		//when in the end of the line then print line number
+		if Config.screenCols-length == len(lineNumberBar) {
+			ab.abAppend(lineNumberBar)
+			break
+		} else {
+			ab.abAppend(" ")
+			length++
 		}
 	}
+	ab.abAppend("\x1b[m") //switch back to normal format
 }
 
 /*** init ***/
@@ -348,4 +379,5 @@ func InitEditor() {
 	if getWindowSize(&Config.screenRows, &Config.screenCols) == -1 {
 		die(fmt.Errorf("couldn't get screen size"))
 	}
+	Config.screenRows--
 }
