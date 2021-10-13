@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 )
@@ -243,11 +244,20 @@ func editorMoveCursor(key int) {
 func EditorProcessKeypress() {
 	c := editorReadKey()
 	switch c {
-	case ('q' & 0x1f):
+	case BACKSPACE, DEL_KEY:
+		//TODO: handle delete
+	case ('s' & 0x1f): //save
+		editorSave()
+	case '\r':
+		//TODO: Enter key
+	case ('q' & 0x1f): //CTRL + Q -> exit
 		io.WriteString(os.Stdout, "\x1b[2J")
 		io.WriteString(os.Stdout, "\x1b[H")
 		DisableRawMode(&Config)
 		os.Exit(0)
+		//CTRL + L -> don't do anything
+	case ('l' & 0x1f):
+		break
 	case HOME_KEY:
 		Config.cx = 0
 	case END_KEY:
@@ -329,6 +339,15 @@ func EditorRefreshScreen() {
 	if e != nil {
 		log.Fatal(e)
 	}
+}
+
+func editorSave() error {
+	editorContent := Config.Content()
+	err := ioutil.WriteFile(Config.fileName, []byte(editorContent), 0644)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func InitEditor() {

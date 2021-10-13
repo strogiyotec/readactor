@@ -1,6 +1,7 @@
 package termio
 
 const (
+	BACKSPACE   = 127
 	ARROW_LEFT  = 1000 + iota
 	ARROW_RIGHT = 1000 + iota
 	ARROW_UP    = 1000 + iota
