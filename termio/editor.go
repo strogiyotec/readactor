@@ -14,9 +14,21 @@ func editorDelChar() {
 	if Config.cy == Config.numRows {
 		return
 	}
+	//if first row and first column just skip
+	if Config.cx == 0 && Config.cy == 0 {
+		return
+	}
+	currentRow := &Config.rows[Config.cy]
 	if Config.cx > 0 {
-		editorDeleteCharAt(&Config.rows[Config.cy], Config.cx-1)
+		editorDeleteCharAt(currentRow, Config.cx-1)
 		Config.cx--
+	} else {
+		//trying to delete the beginning of the line
+		//merge this line with a line above
+		Config.cx = Config.rows[Config.cy-1].size                          // move cursor to the beginning of a line above
+		editorRowAppendString(&Config.rows[Config.cy-1], currentRow.chars) //append this row with one above
+		editorDelRow(Config.cy)
+		Config.cy--
 	}
 }
 
@@ -42,5 +54,24 @@ func editorInsertChar(c byte) {
 	}
 	editorRowInsertChar(&Config.rows[Config.cy], Config.cx, c)
 	Config.cx++
+	Config.dirty = true
+}
+
+//When backspace was pressed in the beginning of a line
+//then merge this line with a one above
+func editorRowAppendString(row *erow, rowContent []byte) {
+	row.chars = append(row.chars, rowContent...)
+	row.size = len(row.chars)
+	editorUpdateRow(row)
+	Config.dirty = true
+
+}
+
+func editorDelRow(at int) {
+	if at < 0 || at >= Config.numRows {
+		return
+	}
+	Config.rows = append(Config.rows[:at], Config.rows[at+1:]...)
+	Config.numRows--
 	Config.dirty = true
 }

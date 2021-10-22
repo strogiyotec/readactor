@@ -140,6 +140,7 @@ func editorRowCxToRx(row *erow, cx int) int {
 	return rx
 }
 
+//Render given row with a right amount of TABS
 func editorUpdateRow(row *erow) {
 	tabs := 0
 	for _, c := range row.chars {
