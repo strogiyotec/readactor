@@ -35,9 +35,10 @@ func editorDrawMessageBar(ab *abuf) {
 func editorDrawStatusBar(ab *abuf) {
 	ab.abAppend("\x1b[7m") //switch to inverted colors
 	statusBar := fmt.Sprintf(
-		"%.20s - %d lines",
+		"%.20s - %d lines %s",
 		Config.fileName,
 		Config.numRows,
+		Config.Modified(),
 	)
 	length := len(statusBar)
 	if length > Config.screenCols {

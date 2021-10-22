@@ -173,6 +173,7 @@ func editorAppendRow(s []byte) {
 	Config.rows = append(Config.rows, r)
 	editorUpdateRow(&Config.rows[Config.numRows])
 	Config.numRows++
+	Config.dirty = true
 }
 
 /*** file I/O ***/
@@ -200,9 +201,10 @@ func EditorOpen(filename string) {
 	if err != nil && err != io.EOF {
 		die(err)
 	}
+	//because we can editorAppendRow above it will treat content as dirty
+	//need to reset dirty flag here
+	Config.dirty = false
 }
-
-/*** input ***/
 
 func editorMoveCursor(key int) {
 	switch key {
@@ -211,13 +213,13 @@ func editorMoveCursor(key int) {
 			Config.cx--
 		} else if Config.cy > 0 {
 			Config.cy--
-			Config.cx = Config.rows[Config.cy].rsize
+			Config.cx = Config.rows[Config.cy].size
 		}
 	case ARROW_RIGHT:
 		if Config.cy < Config.numRows {
-			if Config.cx < Config.rows[Config.cy].rsize {
+			if Config.cx < Config.rows[Config.cy].size {
 				Config.cx++
-			} else if Config.cx == Config.rows[Config.cy].rsize {
+			} else if Config.cx == Config.rows[Config.cy].size {
 				Config.cy++
 				Config.cx = 0
 			}
@@ -246,11 +248,26 @@ func EditorProcessKeypress() {
 	switch c {
 	case BACKSPACE, DEL_KEY:
 		//TODO: handle delete
+		if c == DEL_KEY {
+			editorMoveCursor(ARROW_RIGHT)
+		}
+		editorDelChar()
+		break
 	case ('s' & 0x1f): //save
 		editorSave()
 	case '\r':
 		//TODO: Enter key
 	case ('q' & 0x1f): //CTRL + Q -> exit
+		if Config.dirty && Config.quitPressedCnt != 0 {
+			editorSetStatusMessage(
+				fmt.Sprintf(
+					"WARNING!!! File has unsaved changes.Press CTRL-Q %d times to quit",
+					Config.quitPressedCnt,
+				),
+			)
+			Config.quitPressedCnt--
+			return
+		}
 		io.WriteString(os.Stdout, "\x1b[2J")
 		io.WriteString(os.Stdout, "\x1b[H")
 		DisableRawMode(&Config)
@@ -341,12 +358,28 @@ func EditorRefreshScreen() {
 	}
 }
 
+//TODO: implement
+func editorSetStatusMessage(message string) {
+	Config.statusMessage = message
+}
+
+//save content of the editor to disk
 func editorSave() error {
 	editorContent := Config.Content()
-	err := ioutil.WriteFile(Config.fileName, []byte(editorContent), 0644)
+	err := ioutil.WriteFile(
+		Config.fileName,
+		[]byte(editorContent),
+		0644,
+	)
 	if err != nil {
 		return err
 	}
+	editorSetStatusMessage(fmt.Sprintf(
+		"%d bytes written to disk",
+		len(editorContent),
+	))
+	//we saved the file, dirty flag is reset
+	Config.dirty = false
 	return nil
 }
 
@@ -357,4 +390,6 @@ func InitEditor() {
 	//save last two rows for line number and status message
 	Config.screenRows -= 2
 	Config.statusMessage = "readactor. Press Ctrl-Q to quit"
+	Config.dirty = false
+	Config.quitPressedCnt = DIRTY_QUIT
 }

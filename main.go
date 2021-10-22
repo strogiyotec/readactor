@@ -1,4 +1,5 @@
 package main
+
 //you can save content now
 import (
 	"os"
@@ -13,7 +14,6 @@ func main() {
 	if len(os.Args) > 1 {
 		termio.EditorOpen(os.Args[1])
 	}
-
 	for {
 		termio.EditorRefreshScreen()
 		termio.EditorProcessKeypress()
