@@ -167,16 +167,6 @@ func editorUpdateRow(row *erow) {
 	row.rsize = idx
 }
 
-func editorAppendRow(s []byte) {
-	var r erow
-	r.chars = s
-	r.size = len(s)
-	Config.rows = append(Config.rows, r)
-	editorUpdateRow(&Config.rows[Config.numRows])
-	Config.numRows++
-	Config.dirty = true
-}
-
 /*** file I/O ***/
 
 func EditorOpen(filename string) {
@@ -196,7 +186,7 @@ func EditorOpen(filename string) {
 				c = line[len(line)-1]
 			}
 		}
-		editorAppendRow(line)
+		editorInsertRow(Config.numRows, line)
 	}
 
 	if err != nil && err != io.EOF {
@@ -257,7 +247,8 @@ func EditorProcessKeypress() {
 	case ('s' & 0x1f): //save
 		editorSave()
 	case '\r':
-		//TODO: Enter key
+		//Enter key
+		editorInsertNewLine()
 	case ('q' & 0x1f): //CTRL + Q -> exit
 		if Config.dirty && Config.quitPressedCnt != 0 {
 			editorSetStatusMessage(
